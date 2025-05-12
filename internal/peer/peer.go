@@ -22,7 +22,7 @@ type Peer struct {
 
 	packet.Writer
 
-	outputCh chan *packet.Packet
+	outputCh chan *packet.Packet[packet.Packable]
 }
 
 // polling 是一个状态机
@@ -52,28 +52,25 @@ func (p *Peer) polling(self Info) error {
 func (p *Peer) handshake(self Info) error {
 	var idBytes [32]byte
 	copy(idBytes[:], self.ID)
-	payload, err := (&PayloadHandshake{
-		ID:     idBytes,
-		DHCP:   true,
-		IpCidr: self.CIDR,
-	}).MarshalBinary()
-	if err != nil {
-		return err
-	}
 
-	handshake := &packet.Packet{
-		Type:    packet.TypeHandshake,
-		Payload: payload,
+	handshake := &packet.Packet[packet.Packable]{
+		Type: packet.TypeHandshake,
+		Payload: &packet.PayloadHandshake{
+			ID:     idBytes,
+			DHCP:   true,
+			IpCidr: self.CIDR,
+		},
 	}
-	_, err = p.WriteP(handshake)
+	_, err := p.WriteP(handshake)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *Peer) HandlePing(pkt *packet.Packet) {
-	if _, err := p.WritePayload(packet.TypePong, "Pong"); err != nil {
+func (p *Peer) HandlePing(pkt *packet.Packet[packet.Packable]) {
+	payload := packet.StringPayload("ping")
+	if _, err := p.WritePayload(packet.TypePong, &payload); err != nil {
 		log.Printf("write pong error: %v", err)
 		return
 	}

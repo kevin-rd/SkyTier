@@ -7,6 +7,15 @@ import (
 	"github.com/songgao/water"
 	"kevin-rd/my-tier/pkg/packet"
 	"log"
+	"sync"
+)
+
+var (
+	bufPool = sync.Pool{
+		New: func() any {
+			return make([]byte, 1500)
+		},
+	}
 )
 
 type TunDevice struct {
@@ -27,7 +36,7 @@ func NewTunDevice(name string) (*TunDevice, error) {
 	return &TunDevice{Iface: ifce}, nil
 }
 
-func (t *TunDevice) Run(outputCh chan *packet.Packet) error {
+func (t *TunDevice) Run(outputCh chan *packet.Packet[packet.Packable]) error {
 	// TUN → PeerManager
 	for {
 		pkt, err := t.ReadPacket()
@@ -39,20 +48,22 @@ func (t *TunDevice) Run(outputCh chan *packet.Packet) error {
 	}
 }
 
-func (t *TunDevice) ReadPacket() (*packet.Packet, error) {
-	buf := make([]byte, 1500)
+func (t *TunDevice) ReadPacket() (*packet.Packet[packet.Packable], error) {
+	buf := bufPool.Get().([]byte)
+	defer bufPool.Put(buf)
+
 	_, err := t.Iface.Read(buf)
 	if err != nil {
 		return nil, err
 	}
-	pkt, err := packet.Decode(buf)
-	if err != nil {
+	pkt := new(packet.Packet[packet.Packable])
+	if err = pkt.Decode(buf); err != nil {
 		return nil, errors.Join(packet.ErrPacketDecode, err)
 	}
 	return pkt, nil
 }
 
-func (t *TunDevice) WritePacket(pkt *packet.Packet) error {
+func (t *TunDevice) WritePacket(pkt *packet.Packet[packet.Packable]) error {
 	buf, err := pkt.Encode()
 	if err != nil {
 		return errors.Join(packet.ErrPacketEncode, err)

@@ -31,7 +31,7 @@ var app = &cli.App{
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "host", Usage: "server host", Value: "127.0.0.1"},
 				&cli.IntFlag{Name: "port", Usage: "server port", Value: 6780},
-				&cli.UintFlag{Name: "type", Usage: "Packet type", Value: packet.TypePing},
+				&cli.UintFlag{Name: "type", Usage: "Packet type", Value: packet.TypeHandshake},
 				&cli.StringFlag{Name: "data", Usage: "Packet body data", Value: "hello"},
 			},
 			Action: func(c *cli.Context) error {
@@ -40,22 +40,26 @@ var app = &cli.App{
 				if err != nil {
 					return fmt.Errorf("failed to connect: %w", err)
 				}
-				defer conn.Close()
+				defer func(conn net.Conn) {
+					_ = conn.Close()
+				}(conn)
 
-				pkt := &packet.Packet{
+				pkt := &packet.Packet[packet.Packable]{
 					Version: packet.ProtocolVersion,
 					Type:    byte(c.Uint("type")),
 					Length:  uint16(len(c.String("data"))),
-					Payload: []byte(c.String("data")),
-				}
-				data, err := pkt.Encode()
-				if err != nil {
-					return fmt.Errorf("encode error: %w", err)
+					Payload: &packet.PayloadHandshake{
+						ID:     [32]byte{'h', 'e', 'l', 'l', 'o'},
+						DHCP:   false,
+						IpCidr: "192.168.5.3/24",
+					},
 				}
 
-				if _, err := conn.Write(data); err != nil {
+				writer := packet.NewWriter(conn)
+				if _, err := writer.WriteP(pkt); err != nil {
 					return fmt.Errorf("send error: %w", err)
 				}
+
 				fmt.Println("✅ Sent packet.")
 
 				// Read response
@@ -65,15 +69,12 @@ var app = &cli.App{
 					return fmt.Errorf("read error: %w", err)
 				}
 
-				resp, err := packet.ReadPacket(bytes.NewReader(buf[:n]))
+				resp, err := packet.ReadPacketOnce(bytes.NewReader(buf[:n]))
 				if err != nil {
 					return fmt.Errorf("decode error: %w", err)
 				}
-				fmt.Println("✅ Received packet:", resp.Payload)
+				fmt.Printf("✅ Received packet: %v", resp.Payload)
 
-				for {
-
-				}
 				return nil
 			},
 		},

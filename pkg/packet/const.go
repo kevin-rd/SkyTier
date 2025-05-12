@@ -5,17 +5,17 @@ const (
 )
 
 const (
-	TypeData = 0x01
+	TypeData byte = 0x01
 
 	// TypeAuxPeers request Peers list data
-	TypeAuxPeers      = 0x02
-	TypeAuxPeersReply = 0x03
+	TypeAuxPeers      byte = 0x02
+	TypeAuxPeersReply byte = 0x03
 
 	// TypeHandshake is handshake packet type
-	TypeHandshake      = 0x04
-	TypeHandshakeReply = 0x05
+	TypeHandshake      byte = 0x04
+	TypeHandshakeReply byte = 0x05
 
 	// TypePing is ping packet type
-	TypePing = 0x06
-	TypePong = 0x07
+	TypePing byte = 0x06
+	TypePong byte = 0x07
 )

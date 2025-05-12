@@ -65,13 +65,7 @@ func (m *Manager) connTo(addr string) (*Peer, error) {
 }
 
 // Handshake 处理握手消息, 被动连接Peer
-func (m *Manager) Handshake(pkt *packet.Packet) {
-	handshake, err := Decode(pkt.Payload)
-	if err != nil {
-		log.Println("decode handshake error:", err)
-		return
-	}
-
+func (m *Manager) Handshake(w packet.Writer, handshake *packet.PayloadHandshake) {
 	id := bytes.Trim(handshake.ID[:], "\x00")
 	peer, ok := m.Peers[string(id)]
 	if !ok {
@@ -79,6 +73,13 @@ func (m *Manager) Handshake(pkt *packet.Packet) {
 		peer = &Peer{
 			Info: Info{string(id), handshake.IpCidr},
 		}
+	}
+
+	// write reply message
+	pkt := packet.NewPacket(packet.TypeHandshakeReply, &packet.HandshakeReplyPayload{Hello: "ni hao"})
+	if _, err := w.WriteP(pkt); err != nil {
+		log.Printf("write handshake reply error: %v", err)
+		return
 	}
 	peer.State = STATE_HANDSHAKED
 }

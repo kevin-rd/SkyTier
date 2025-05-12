@@ -13,7 +13,7 @@ import (
 var (
 	bufPool = sync.Pool{
 		New: func() any {
-			return make([]byte, 1024)
+			return make([]byte, 1500)
 		},
 	}
 )
@@ -27,12 +27,12 @@ type conn struct {
 }
 
 func (c *conn) serve() {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Printf("mixed_server: panic serving %v: %v", c.remoteAddr, err)
-		}
-		c.close()
-	}()
+	//defer func() {
+	//	if err := recover(); err != nil {
+	//		log.Printf("mixed_server: panic serving %v: %v", c.remoteAddr, err)
+	//	}
+	//	c.close()
+	//}()
 
 	// todo: 使用bufio
 	c.buf = bufPool.Get().([]byte)
@@ -46,10 +46,8 @@ func (c *conn) serve() {
 			}
 			return
 		}
-
-		var pkt *packet.Packet
-		pkt, err = packet.Decode(c.buf[:n])
-		if err != nil {
+		pkt := &packet.Packet[packet.Packable]{}
+		if err = pkt.Decode(c.buf[:n]); err != nil {
 			log.Println("decode error:", err)
 			continue
 		}

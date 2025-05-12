@@ -10,7 +10,7 @@ import (
 
 type Router struct {
 	// buffer
-	outputCh chan *packet.Packet
+	outputCh chan *packet.Packet[packet.Packable]
 
 	tun     *tun.TunDevice
 	manager *peer.Manager
@@ -18,17 +18,17 @@ type Router struct {
 
 func NewRouter(tun *tun.TunDevice, manager *peer.Manager) *Router {
 	return &Router{
-		outputCh: make(chan *packet.Packet, 1024),
+		outputCh: make(chan *packet.Packet[packet.Packable], 1024),
 		tun:      tun,
 		manager:  manager,
 	}
 }
 
-func (r *Router) Output(pkt *packet.Packet) {
+func (r *Router) Output(pkt *packet.Packet[packet.Packable]) {
 
 }
 
-func (r *Router) Input(w packet.Writer, pkt *packet.Packet) {
+func (r *Router) Input(w packet.Writer, pkt *packet.Packet[packet.Packable]) {
 	// todo
 	log.Printf("input packet: %v", pkt.Type)
 	switch pkt.Type {
@@ -58,12 +58,16 @@ func (r *Router) Input(w packet.Writer, pkt *packet.Packet) {
 			p.HandlePing(pkt)
 		}
 	case packet.TypeHandshake:
-		r.manager.Handshake(pkt)
-
+		handshake, ok := pkt.Payload.(*packet.PayloadHandshake)
+		if !ok {
+			log.Printf("invalid handshake payload")
+			return
+		}
+		r.manager.Handshake(w, handshake)
 	}
 }
 
-func (r *Router) toTun(pkt *packet.Packet) {
+func (r *Router) toTun(pkt *packet.Packet[packet.Packable]) {
 	if err := r.tun.WritePacket(pkt); err != nil {
 		log.Println("TUN write error:", err)
 	}
