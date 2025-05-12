@@ -3,28 +3,32 @@ package engine
 
 import (
 	"fmt"
+	"kevin-rd/my-tier/internal/peer"
 	"kevin-rd/my-tier/internal/seed"
 	"kevin-rd/my-tier/internal/tun"
+	"kevin-rd/my-tier/pkg/mixed_server"
 	"kevin-rd/my-tier/pkg/packet"
 	"log"
 	"net"
 )
 
 type Engine struct {
-	Tun       *tun.TunDevice
-	MixedAddr string // Mixed Addr local
-	mux       *ServeMux
+	Tun *tun.TunDevice
+
+	MixedAddr   string // Mixed Addr local
+	mixedServer *mixed_server.MixedServer
 
 	config *Config
 
-	seed *seed.Service
+	peerManager *peer.Manager
+	seed        *seed.Service
 }
 
 func New(opts ...Option) *Engine {
 	cfg := NewConfig(opts...)
 
 	e := &Engine{
-		MixedAddr: "127.0.0.1:8080",
+		MixedAddr: fmt.Sprintf(":%d", cfg.MixedPort),
 		config:    cfg,
 	}
 
@@ -41,12 +45,23 @@ func New(opts ...Option) *Engine {
 
 func (e *Engine) Start() error {
 
-	if err := e.StartMixedServer(); err != nil {
-		return fmt.Errorf("start mixed server fixed: %w", err)
+	// Peers Manager
+	e.peerManager = peer.NewManager(e.config.ID, e.config.VirtualIP, e.config.Peers...)
+
+	// ListenAndServe Mixed Server
+	router := mixed_server.NewServeMux()
+	e.mixedServer = &mixed_server.MixedServer{
+		ListenAddr: e.MixedAddr,
+		Handler:    router,
 	}
-	e.mux.RegisterHandle(packet.TypeAuxPeers, e.HandleGetPeers)
-	e.mux.RegisterHandle(packet.TypePing, e.HandlePing)
-	log.Printf("register all hanlders to mixed server, count: %d", len(e.mux.handlers))
+	router.RegisterHandle(packet.TypeAuxPeers, e.HandleGetPeers)
+	router.RegisterHandle(packet.TypePing, e.HandlePing)
+	router.RegisterHandle(packet.TypeHandshake, e.HandleHandshake)
+	log.Printf("register all hanlders to mixed server")
+	log.Printf("start mixed server on: %v", e.mixedServer.ListenAddr)
+	if err := e.mixedServer.ListenAndServe(); err != nil {
+		return fmt.Errorf("start mixed server error: %w", err)
+	}
 
 	return nil
 }

@@ -2,8 +2,10 @@ package utils
 
 import (
 	"log"
+	"math/rand"
 	"os"
 	"os/signal"
+	"time"
 )
 
 func WaitSignal(signals []os.Signal, fns ...func()) {
@@ -34,4 +36,14 @@ func WaitSignal(signals []os.Signal, fns ...func()) {
 			return
 		}
 	}
+}
+
+func RandomString(length int) string {
+	rand.Seed(time.Now().UnixNano())
+	chars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	result := make([]byte, length)
+	for i := 0; i < length; i++ {
+		result[i] = chars[rand.Intn(len(chars))]
+	}
+	return string(result)
 }
