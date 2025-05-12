@@ -1,6 +1,6 @@
 package engine
 
-import "kevin-rd/my-tier/internal/utils"
+import "kevin-rd/my-tier/pkg/utils"
 
 type Config struct {
 	ID        string // limit 32 bits
@@ -56,8 +56,8 @@ func WithTunName(tunName string) Option {
 	}
 }
 
-func WithPublicAddr(addr string) Option {
+func WithPublicAddr(addr ...string) Option {
 	return func(c *Config) {
-		c.PublicServerAddr = addr
+		c.Peers = addr
 	}
 }

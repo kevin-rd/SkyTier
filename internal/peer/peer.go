@@ -1,10 +1,8 @@
 package peer
 
 import (
-	"kevin-rd/my-tier/internal/tun"
 	"kevin-rd/my-tier/pkg/packet"
 	"log"
-	"net"
 )
 
 const (
@@ -20,9 +18,9 @@ type Info struct {
 type Peer struct {
 	Info
 	State      int32
-	ListenAddr string
+	RemoteAddr string
 
-	*packet.Writer
+	packet.Writer
 
 	outputCh chan *packet.Packet
 }
@@ -74,35 +72,9 @@ func (p *Peer) handshake(self Info) error {
 	return nil
 }
 
-func handleConn(conn net.Conn, t *tun.TunDevice) {
-	defer conn.Close()
-
-	go func() {
-		// Peer → TUN
-		buf := make([]byte, 1500)
-		for {
-			n, err := conn.Read(buf)
-			if err != nil {
-				log.Println("read error from peer", err)
-				return
-			}
-			err = t.WritePacket(buf[:n])
-			if err != nil {
-				log.Println("TUN write error:", err)
-			}
-		}
-	}()
-
-	// TUN → Peer
-	for {
-		packet, err := t.ReadPacket()
-		if err != nil {
-			log.Println("tun read error:", err)
-			return
-		}
-		if _, err := conn.Write(packet); err != nil {
-			log.Println("conn write error:", err)
-			return
-		}
+func (p *Peer) HandlePing(pkt *packet.Packet) {
+	if _, err := p.WritePayload(packet.TypePong, "Pong"); err != nil {
+		log.Printf("write pong error: %v", err)
+		return
 	}
 }

@@ -2,12 +2,15 @@
 package tun
 
 import (
+	"errors"
 	"fmt"
 	"github.com/songgao/water"
+	"kevin-rd/my-tier/pkg/packet"
+	"log"
 )
 
 type TunDevice struct {
-	Ifce *water.Interface
+	Iface *water.Interface
 }
 
 func NewTunDevice(name string) (*TunDevice, error) {
@@ -21,19 +24,40 @@ func NewTunDevice(name string) (*TunDevice, error) {
 		return nil, fmt.Errorf("failed to create TUN device: %v", err)
 	}
 
-	return &TunDevice{Ifce: ifce}, nil
+	return &TunDevice{Iface: ifce}, nil
 }
 
-func (t *TunDevice) ReadPacket() ([]byte, error) {
-	packet := make([]byte, 1500)
-	n, err := t.Ifce.Read(packet)
+func (t *TunDevice) Run(outputCh chan *packet.Packet) error {
+	// TUN → PeerManager
+	for {
+		pkt, err := t.ReadPacket()
+		if err != nil {
+			log.Println("tun read error:", err)
+			continue
+		}
+		outputCh <- pkt
+	}
+}
+
+func (t *TunDevice) ReadPacket() (*packet.Packet, error) {
+	buf := make([]byte, 1500)
+	_, err := t.Iface.Read(buf)
 	if err != nil {
 		return nil, err
 	}
-	return packet[:n], nil
+	pkt, err := packet.Decode(buf)
+	if err != nil {
+		return nil, errors.Join(packet.ErrPacketDecode, err)
+	}
+	return pkt, nil
 }
 
-func (t *TunDevice) WritePacket(packet []byte) error {
-	_, err := t.Ifce.Write(packet)
+func (t *TunDevice) WritePacket(pkt *packet.Packet) error {
+	buf, err := pkt.Encode()
+	if err != nil {
+		return errors.Join(packet.ErrPacketEncode, err)
+	}
+
+	_, err = t.Iface.Write(buf)
 	return err
 }

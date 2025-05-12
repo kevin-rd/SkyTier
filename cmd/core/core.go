@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 	"kevin-rd/my-tier/internal/engine"
-	"kevin-rd/my-tier/internal/utils"
+	"kevin-rd/my-tier/pkg/utils"
 	"log"
 	"os"
 )
@@ -11,29 +11,36 @@ import (
 const version = "latest"
 
 var app = &cli.App{
-	Name:    "my-tier",
-	Version: version,
-	Usage:   "a tier network",
+	Name:      "skytier-core",
+	Version:   version,
+	Usage:     "A simple, decentralized mesh VPN.",
+	UsageText: "skytier-core [global options]",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "id",
 			Usage: "id name of this tier",
 			Value: "",
 		},
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "fixed-port",
 			Usage: "fixed port for mixed server",
 			Value: 0,
 		},
+		&cli.StringSliceFlag{
+			Name:    "peer",
+			Aliases: []string{"p"},
+			Usage:   "remote peer addr",
+			Value:   nil,
+		},
 	},
-	Action: func(c *cli.Context) {
+	Action: func(c *cli.Context) error {
 		log.Println("starting my-tier core")
 		e := engine.New(
 			engine.WithID(c.String("id")),
 			engine.WithVirtualIP("10.0.0.1"),
 			engine.WithFixedPort(c.Int("fixed-port")),
 			engine.WithTunName(""),
-			engine.WithPublicAddr("127.0.0.1:6780"),
+			engine.WithPublicAddr(c.StringSlice("peer")...),
 		)
 
 		if err := e.Start(); err != nil {
@@ -44,5 +51,6 @@ var app = &cli.App{
 			log.Println("Stopping...")
 			e.Stop()
 		})
+		return nil
 	},
 }

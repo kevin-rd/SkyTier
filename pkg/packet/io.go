@@ -6,27 +6,35 @@ import (
 	"net"
 )
 
-type Writer struct {
-	conn net.Conn
+type Writer interface {
+	Write(pkt []byte) (int, error)
+	WriteP(pkt *Packet) (int, error)
+	WritePayload(typ byte, payload any) (int, error)
+
+	RemoteAddr() string
 }
 
-func NewWriter(conn net.Conn) *Writer {
-	return &Writer{conn: conn}
+type writer struct {
+	net.Conn
 }
 
-func (w *Writer) Write(pkt []byte) (int, error) {
-	return w.conn.Write(pkt)
+func NewWriter(conn net.Conn) Writer {
+	return &writer{conn}
 }
 
-func (w *Writer) WriteP(pkt *Packet) (int, error) {
+func (w *writer) Write(pkt []byte) (int, error) {
+	return w.Conn.Write(pkt)
+}
+
+func (w *writer) WriteP(pkt *Packet) (int, error) {
 	bts, err := pkt.Encode()
 	if err != nil {
 		return 0, err
 	}
-	return w.conn.Write(bts)
+	return w.Conn.Write(bts)
 }
 
-func (w *Writer) WritePayload(typ byte, payload any) (int, error) {
+func (w *writer) WritePayload(typ byte, payload any) (int, error) {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	if err := enc.Encode(payload); err != nil {
@@ -38,4 +46,8 @@ func (w *Writer) WritePayload(typ byte, payload any) (int, error) {
 		Type:    typ,
 		Payload: buf.Bytes(),
 	})
+}
+
+func (w *writer) RemoteAddr() string {
+	return w.Conn.RemoteAddr().String()
 }

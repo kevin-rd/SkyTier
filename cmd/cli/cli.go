@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 	"kevin-rd/my-tier/pkg/packet"
 	"net"
 	"time"
@@ -12,25 +12,25 @@ import (
 const version = "latest"
 
 var app = &cli.App{
-	Name:    "my-tier",
+	Name:    "skytier-cli",
 	Version: version,
-	Usage:   "a tier network",
+	Usage:   "A simple, decentralized mesh VPN.",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "tun-name",
 			Usage: "tun name",
 		},
 	},
-	Action: func(c *cli.Context) {
-
+	Action: func(c *cli.Context) error {
+		return nil
 	},
-	Commands: []cli.Command{
+	Commands: []*cli.Command{
 		{
 			Name:  "test",
 			Usage: "test tier network",
 			Flags: []cli.Flag{
-				cli.StringFlag{Name: "host", Usage: "server host", Value: "127.0.0.1"},
-				cli.IntFlag{Name: "port", Usage: "server port", Value: 8080},
+				&cli.StringFlag{Name: "host", Usage: "server host", Value: "127.0.0.1"},
+				&cli.IntFlag{Name: "port", Usage: "server port", Value: 6780},
 				&cli.UintFlag{Name: "type", Usage: "Packet type", Value: packet.TypePing},
 				&cli.StringFlag{Name: "data", Usage: "Packet body data", Value: "hello"},
 			},

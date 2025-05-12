@@ -2,8 +2,8 @@ package peer
 
 import (
 	"bytes"
-	"kevin-rd/my-tier/internal/utils"
 	"kevin-rd/my-tier/pkg/packet"
+	"kevin-rd/my-tier/pkg/utils"
 	"log"
 	"net"
 )
@@ -11,7 +11,7 @@ import (
 type Manager struct {
 	Info
 
-	// peer_id -> Peer
+	// remote_addr -> Peer
 	Peers map[string]*Peer
 }
 
@@ -27,11 +27,23 @@ func NewManager(id, cidr string, addrs ...string) *Manager {
 			log.Printf("connect to %s error: %v", addr, err)
 			continue
 		}
-		m.Peers[peer.ID] = peer
+		m.Peers[addr] = peer
 	}
 
 	go m.manage()
 	return m
+}
+
+func (m *Manager) GetPeer(remoteAddr string) *Peer {
+	if peer, ok := m.Peers[remoteAddr]; ok {
+		return peer
+	}
+	return nil
+}
+
+func (m *Manager) GetPeers(network string) ([]*Peer, error) {
+	// todo
+	return nil, nil
 }
 
 func (m *Manager) manage() {
@@ -53,7 +65,7 @@ func (m *Manager) connTo(addr string) (*Peer, error) {
 }
 
 // Handshake 处理握手消息, 被动连接Peer
-func (m *Manager) Handshake(conn net.Conn, pkt *packet.Packet) {
+func (m *Manager) Handshake(pkt *packet.Packet) {
 	handshake, err := Decode(pkt.Payload)
 	if err != nil {
 		log.Println("decode handshake error:", err)
@@ -68,6 +80,5 @@ func (m *Manager) Handshake(conn net.Conn, pkt *packet.Packet) {
 			Info: Info{string(id), handshake.IpCidr},
 		}
 	}
-	peer.Writer = packet.NewWriter(conn)
 	peer.State = STATE_HANDSHAKED
 }

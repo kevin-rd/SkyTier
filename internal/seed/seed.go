@@ -10,7 +10,7 @@ type Service struct {
 }
 
 type PeersReplyPayload struct {
-	Peers []peer.Peer
+	Peers []*peer.Peer
 }
 
 func (s *Service) GetPeers(network string) ([]peer.Peer, error) {
