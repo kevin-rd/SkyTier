@@ -205,24 +205,3 @@ func TestDecode_PayloadDecodeError(t *testing.T) {
 
 	assert.ErrorIs(t, err, TestError)
 }
-
-func TestDecodePayload_Success(t *testing.T) {
-	data := []byte{ //0x10, 0x04, 0x00, 0x00,
-		'h', 'e', 'l', 'l', 'o', 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 192, 168, 22, 1, 24,
-	}
-
-	pl, err := decodePayload[Packable](TypeHandshake, data)
-
-	assert.NoError(t, err)
-	assert.NotNil(t, pl)
-}
-
-func TestDecodePayload_UnknownType(t *testing.T) {
-	_, err := decodePayload[Packable](0xFF, nil)
-
-	assert.ErrorContains(t, err, "unknown packet type")
-}

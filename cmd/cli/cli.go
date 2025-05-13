@@ -31,7 +31,7 @@ var app = &cli.App{
 			Flags: []cli.Flag{
 				&cli.StringFlag{Name: "host", Usage: "server host", Value: "127.0.0.1"},
 				&cli.IntFlag{Name: "port", Usage: "server port", Value: 6780},
-				&cli.UintFlag{Name: "type", Usage: "Packet type", Value: packet.TypeHandshake},
+				&cli.UintFlag{Name: "type", Usage: "Packet type", Value: uint(packet.TypeHandshake)},
 				&cli.StringFlag{Name: "data", Usage: "Packet body data", Value: "hello"},
 			},
 			Action: func(c *cli.Context) error {

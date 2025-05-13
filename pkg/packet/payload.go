@@ -15,6 +15,21 @@ type Packable interface {
 	Length() int
 }
 
+// newPayload creates a new payload instance based on the given type.
+// used to isolate generics type.
+func newPayload(typ byte) (Packable, error) {
+	var payload Packable
+	switch typ {
+	case TypeHandshake:
+		payload = new(PayloadHandshake)
+	case TypeHandshakeReply:
+		payload = new(HandshakeReplyPayload)
+	default:
+		return nil, fmt.Errorf("unknown packet type: %d", typ)
+	}
+	return payload, nil
+}
+
 type StringPayload string
 
 func (s *StringPayload) Encode() ([]byte, error) {

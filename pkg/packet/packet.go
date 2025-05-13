@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"reflect"
 )
 
@@ -96,17 +95,12 @@ func (p *Packet[T]) Decode(data []byte) error {
 		return errors.Join(ErrPacketDecode, ErrPacketIncomplete)
 	}
 
-	// read payload, todo: 抽出来
+	// read payload
 	val := reflect.ValueOf(p.Payload)
 	if val.Kind() == reflect.Invalid || val.IsNil() {
-		var payload Packable
-		switch p.Type {
-		case TypeHandshake:
-			payload = new(PayloadHandshake)
-		case TypeHandshakeReply:
-			payload = new(HandshakeReplyPayload)
-		default:
-			return errors.Join(ErrPacketDecode, fmt.Errorf("unknown packet type: %d", p.Type))
+		payload, err := newPayload(p.Type)
+		if err != nil {
+			return errors.Join(ErrPacketDecode, err)
 		}
 		p.Payload = any(payload).(T)
 	}
@@ -115,19 +109,4 @@ func (p *Packet[T]) Decode(data []byte) error {
 	}
 
 	return nil
-}
-
-// Deprecated: 未使用
-func decodePayload[T Packable](typ byte, data []byte) (payload T, err error) {
-	var pl Packable
-	switch typ {
-	case TypeHandshake:
-		pl = new(PayloadHandshake)
-	default:
-		return payload, errors.Join(ErrPacketDecode, fmt.Errorf("unknown packet type: %d", typ))
-	}
-	if err = pl.Decode(data); err != nil {
-		return payload, errors.Join(ErrPacketDecode, err)
-	}
-	return any(pl).(T), nil
 }
