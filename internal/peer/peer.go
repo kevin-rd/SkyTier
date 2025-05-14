@@ -31,7 +31,7 @@ func (p *Peer) polling(self Info) error {
 		switch p.State {
 		case STATE_INIT:
 			if err := p.handshake(self); err != nil {
-				log.Println("handshake error:", err)
+				log.Println("[peer] handshake error:", err)
 				continue
 			}
 			p.State = STATE_HANDSHAKED
@@ -39,7 +39,7 @@ func (p *Peer) polling(self Info) error {
 			pkt := <-p.outputCh
 			_, err := p.WriteP(pkt)
 			if err != nil {
-				log.Println("write packet error:", err)
+				log.Println("[peer] write packet error:", err)
 				continue
 			}
 
@@ -71,7 +71,7 @@ func (p *Peer) handshake(self Info) error {
 func (p *Peer) HandlePing(pkt *packet.Packet[packet.Packable]) {
 	payload := packet.StringPayload("ping")
 	if _, err := p.WritePayload(packet.TypePong, &payload); err != nil {
-		log.Printf("write pong error: %v", err)
+		log.Printf("[peer] write pong error: %v", err)
 		return
 	}
 }

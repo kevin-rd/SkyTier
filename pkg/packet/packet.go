@@ -45,19 +45,19 @@ func (p *Packet[T]) Encode() ([]byte, error) {
 
 	buf := new(bytes.Buffer)
 
-	// Version 4 bit
+	// Version(4) + Reserved(4)
 	if err := buf.WriteByte(p.Version<<4 | 0x00); err != nil {
 		return nil, errors.Join(ErrPacketEncode, err)
 	}
-	// Type 8 bit
+	// Type(8)
 	if err := buf.WriteByte(p.Type); err != nil {
 		return nil, errors.Join(ErrPacketEncode, err)
 	}
-	// Length 16 bit
+	// Length(16)
 	if err := binary.Write(buf, binary.BigEndian, uint16(p.Payload.Length())); err != nil {
 		return nil, errors.Join(ErrPacketEncode, err)
 	}
-	// read payload with packable.Encode()
+	// Payload with packable.Encode()
 	payloadBytes, err := p.Payload.Encode()
 	if err != nil {
 		return nil, errors.Join(ErrPacketEncode, err)

@@ -1,11 +1,11 @@
-package engine
+package core
 
 import "kevin-rd/my-tier/pkg/utils"
 
 type Config struct {
 	ID        string // limit 32 bits
 	VirtualIP string // e.g. "192.168.10.1/24"
-	MixedPort int
+	UDPPort   int
 	TunName   string
 
 	Peers []string
@@ -16,8 +16,8 @@ type Config struct {
 
 func NewConfig(opts ...Option) *Config {
 	c := &Config{
-		ID:        utils.RandomString(16),
-		MixedPort: 6780,
+		ID:      utils.RandomString(16),
+		UDPPort: 6780,
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -45,7 +45,7 @@ func WithVirtualIP(ip string) Option {
 func WithFixedPort(port int) Option {
 	return func(c *Config) {
 		if port > 0 && port < 65535 {
-			c.MixedPort = port
+			c.UDPPort = port
 		}
 	}
 }

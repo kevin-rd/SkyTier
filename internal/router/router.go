@@ -30,7 +30,7 @@ func (r *Router) Output(pkt *packet.Packet[packet.Packable]) {
 
 func (r *Router) Input(w packet.Writer, pkt *packet.Packet[packet.Packable]) {
 	// todo
-	log.Printf("input packet: %v", pkt.Type)
+	log.Printf("[router] input packet: %v", pkt.Type)
 	switch pkt.Type {
 	case packet.TypeData:
 		// 1. 是否转发
@@ -42,15 +42,12 @@ func (r *Router) Input(w packet.Writer, pkt *packet.Packet[packet.Packable]) {
 		// todo
 
 		networkName := "default"
-		peers, err := r.manager.GetPeers(networkName)
-		if err != nil {
-			return
-		}
+		peers := r.manager.GetPeers(networkName)
 
-		if _, err = w.WritePayload(packet.TypeAuxPeersReply, &seed.PeersReplyPayload{
+		if _, err := w.WritePayload(packet.TypeAuxPeersReply, &seed.PeersReplyPayload{
 			Peers: peers,
 		}); err != nil {
-			log.Printf("write payload error: %v", err)
+			log.Printf("[router] write payload error: %v", err)
 			return
 		}
 	case packet.TypePing:
@@ -60,7 +57,7 @@ func (r *Router) Input(w packet.Writer, pkt *packet.Packet[packet.Packable]) {
 	case packet.TypeHandshake:
 		handshake, ok := pkt.Payload.(*packet.PayloadHandshake)
 		if !ok {
-			log.Printf("invalid handshake payload")
+			log.Printf("[router] invalid handshake payload")
 			return
 		}
 		r.manager.Handshake(w, handshake)
@@ -69,6 +66,6 @@ func (r *Router) Input(w packet.Writer, pkt *packet.Packet[packet.Packable]) {
 
 func (r *Router) toTun(pkt *packet.Packet[packet.Packable]) {
 	if err := r.tun.WritePacket(pkt); err != nil {
-		log.Println("TUN write error:", err)
+		log.Println("[router] TUN write error:", err)
 	}
 }

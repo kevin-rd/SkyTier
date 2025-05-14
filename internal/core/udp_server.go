@@ -1,4 +1,4 @@
-package engine
+package core
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"time"
 )
 
 var (
@@ -19,7 +20,7 @@ var (
 )
 
 type conn struct {
-	server     *MixedServer
+	server     *UDPServer
 	remoteAddr string
 	net.Conn
 
@@ -40,15 +41,16 @@ func (c *conn) serve() {
 		n, err := c.Read(c.buf)
 		if err != nil {
 			if err == io.EOF {
-				log.Println("client closed connection:", err)
+				log.Printf("[udp_server] connection closed by client: %v", c.remoteAddr)
 			} else {
-				log.Println("mixed server read error:", err)
+				log.Printf("[udp_server] udp server read error from %v: %v", c.remoteAddr, err)
 			}
 			return
 		}
+
 		pkt := &packet.Packet[packet.Packable]{}
 		if err = pkt.Decode(c.buf[:n]); err != nil {
-			log.Println("decode error:", err)
+			log.Printf("[udp_server] udp server read error from %v: %v", c.remoteAddr, err)
 			continue
 		}
 
@@ -66,34 +68,49 @@ func (c *conn) close() {
 	}
 }
 
-type MixedServer struct {
+type UDPServer struct {
 	ListenAddr string
 	router     *router.Router
 }
 
-func (s *MixedServer) ListenAndServe() error {
+func (s *UDPServer) ListenAndServe() error {
 	listener, err := net.Listen("tcp", s.ListenAddr)
 	if err != nil {
-		return fmt.Errorf("listen error: %w", err)
+		return fmt.Errorf("[udp_server] listen error: %w", err)
 	}
 
-	go func() {
-		for {
-			var rwc net.Conn
-			rwc, err = listener.Accept()
-			if err != nil {
-				log.Println("accept error:", err)
+	var tempDelay time.Duration // how long to sleep on accept temporary failure
+
+	for {
+		var rwc net.Conn
+		rwc, err = listener.Accept()
+		if err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Temporary() {
+				if tempDelay == 0 {
+					tempDelay = 5 * time.Millisecond
+				} else {
+					tempDelay *= 2
+					if tempDelay > 1*time.Second {
+						tempDelay = 1 * time.Second
+					}
+				}
+
+				log.Println("[udp_server] temporary listen error:", err)
+				time.Sleep(tempDelay)
 				continue
 			}
-			c := s.newConn(rwc)
-			// todo: add context
-			go c.serve()
+			log.Println("[udp_server] accept error:", err)
+			return err
 		}
-	}()
-	return nil
+
+		tempDelay = 0
+		c := s.newConn(rwc)
+		// todo: add context
+		go c.serve()
+	}
 }
 
-func (s *MixedServer) newConn(rwc net.Conn) *conn {
+func (s *UDPServer) newConn(rwc net.Conn) *conn {
 	return &conn{
 		server:     s,
 		remoteAddr: rwc.RemoteAddr().String(),

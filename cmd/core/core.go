@@ -1,8 +1,8 @@
 package main
 
 import (
-	cli "github.com/urfave/cli/v2"
-	"kevin-rd/my-tier/internal/engine"
+	"github.com/urfave/cli/v2"
+	"kevin-rd/my-tier/internal/core"
 	"kevin-rd/my-tier/pkg/utils"
 	"log"
 	"os"
@@ -35,17 +35,19 @@ var app = &cli.App{
 	},
 	Action: func(c *cli.Context) error {
 		log.Println("starting my-tier core")
-		e := engine.New(
-			engine.WithID(c.String("id")),
-			engine.WithVirtualIP("10.0.0.1"),
-			engine.WithFixedPort(c.Int("fixed-port")),
-			engine.WithTunName(""),
-			engine.WithPublicAddr(c.StringSlice("peer")...),
+		e := core.New(
+			core.WithID(c.String("id")),
+			core.WithVirtualIP("10.0.0.1"),
+			core.WithFixedPort(c.Int("fixed-port")),
+			core.WithTunName(""),
+			core.WithPublicAddr(c.StringSlice("peer")...),
 		)
 
-		if err := e.Start(); err != nil {
-			log.Fatal(err)
-		}
+		go func() {
+			if err := e.Run(); err != nil {
+				log.Fatal(err)
+			}
+		}()
 
 		utils.WaitSignal([]os.Signal{os.Interrupt}, func() {
 			log.Println("Stopping...")
