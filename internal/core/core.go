@@ -6,11 +6,12 @@ import (
 	"kevin-rd/my-tier/internal/ipc/unixsocket"
 	"kevin-rd/my-tier/internal/peer"
 	"kevin-rd/my-tier/internal/router"
-	"kevin-rd/my-tier/internal/seed"
 	"kevin-rd/my-tier/internal/tun"
 	"kevin-rd/my-tier/pkg/ipc/message"
 	ipc_unix "kevin-rd/my-tier/pkg/ipc/unix_socket"
+	"kevin-rd/my-tier/pkg/utils"
 	"log"
+	"net"
 	"sync"
 )
 
@@ -26,7 +27,6 @@ type Core struct {
 	udpServer *UDPServer
 
 	peerManager *peer.Manager
-	seed        *seed.Service
 }
 
 func New(opts ...Option) *Core {
@@ -51,7 +51,8 @@ func (c *Core) Run() error {
 	wg.Add(3)
 
 	// Peers Manager
-	c.peerManager = peer.NewManager(c.config.ID, c.config.VirtualIP, c.config.Peers...)
+	vip := utils.Must2IPMask(c.config.VirtualIP)
+	c.peerManager = peer.NewManager(c.config.ID, vip, c.config.Peers...)
 	go func() {
 		defer wg.Done()
 
@@ -72,11 +73,16 @@ func (c *Core) Run() error {
 	}()
 
 	// UDP Server
-	c.udpServer = &UDPServer{
-		ListenAddr: fmt.Sprintf(":%d", c.config.UDPPort),
-		router:     router.NewRouter(c.Tun, c.peerManager),
+	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", c.config.UDPPort))
+	if err != nil {
+		log.Fatalf("[core] resolve udp addr error: %v", err)
 	}
-	log.Printf("[core] start udp server on: %v", c.udpServer.ListenAddr)
+	c.udpServer = &UDPServer{
+		ListenAddr:  addr,
+		router:      router.NewRouter(c.Tun, c.peerManager),
+		peerManager: c.peerManager,
+	}
+	log.Printf("[core] start udp server on: %v", addr)
 	go func() {
 		defer wg.Done()
 		if err := c.udpServer.ListenAndServe(); err != nil {

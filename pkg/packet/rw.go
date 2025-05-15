@@ -21,19 +21,31 @@ type Writer interface {
 	WriteP(pkt *Packet[Packable]) (int, error)
 	WritePayload(typ byte, payload Packable) (int, error)
 
-	RemoteAddr() string
+	RemoteAddr() net.Addr
+	// Deprecated
+	GetConn() net.Conn
 }
 
 type writer struct {
 	net.Conn
+	remoteAddr net.Addr
 }
 
-func NewWriter(conn net.Conn) Writer {
-	return &writer{conn}
+func NewWriter(conn net.Conn, remoteAddr net.Addr) Writer {
+	return &writer{conn, remoteAddr}
 }
 
 func (w *writer) Write(pkt []byte) (int, error) {
-	return w.Conn.Write(pkt)
+	switch c := w.Conn.(type) {
+	case *net.UDPConn:
+		if c.RemoteAddr() == nil {
+			return c.WriteToUDP(pkt, w.remoteAddr.(*net.UDPAddr))
+		} else {
+			return c.Write(pkt)
+		}
+	default:
+		return c.Write(pkt)
+	}
 }
 
 func (w *writer) WriteP(pkt *Packet[Packable]) (int, error) {
@@ -41,7 +53,7 @@ func (w *writer) WriteP(pkt *Packet[Packable]) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return w.Conn.Write(bts)
+	return w.Write(bts)
 }
 
 func (w *writer) WritePayload(typ byte, payload Packable) (int, error) {
@@ -52,8 +64,13 @@ func (w *writer) WritePayload(typ byte, payload Packable) (int, error) {
 	})
 }
 
-func (w *writer) RemoteAddr() string {
-	return w.Conn.RemoteAddr().String()
+// RemoteAddr may be have a bug, because the UDP conn dont support RemoteAddr() method.
+func (w *writer) RemoteAddr() net.Addr {
+	return w.remoteAddr
+}
+
+func (w *writer) GetConn() net.Conn {
+	return w.Conn
 }
 
 type Reader interface {

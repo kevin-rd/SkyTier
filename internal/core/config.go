@@ -1,6 +1,10 @@
 package core
 
-import "kevin-rd/my-tier/pkg/utils"
+import (
+	"fmt"
+	"kevin-rd/my-tier/pkg/utils"
+	"net"
+)
 
 type Config struct {
 	ID        string // limit 32 bits
@@ -16,8 +20,9 @@ type Config struct {
 
 func NewConfig(opts ...Option) *Config {
 	c := &Config{
-		ID:      utils.RandomString(16),
-		UDPPort: 6780,
+		ID:        utils.RandomString(16),
+		UDPPort:   6780,
+		VirtualIP: "192.168.100.1/24",
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -36,9 +41,21 @@ func WithID(id string) Option {
 	}
 }
 
-func WithVirtualIP(ip string) Option {
+func WithVirtualIP(ipStr string) Option {
 	return func(c *Config) {
-		c.VirtualIP = ip
+		ip, ipNet, err := net.ParseCIDR(ipStr)
+		if err == nil && ip != nil {
+			ip = ip.To4()
+			if ip != nil {
+				c.VirtualIP = fmt.Sprintf("%s/%d", ip.String(), ipNet.Mask)
+				return
+			}
+		}
+		ip = net.ParseIP(ipStr)
+		if ip != nil {
+			c.VirtualIP = fmt.Sprintf("%s/24", ip.String())
+			return
+		}
 	}
 }
 

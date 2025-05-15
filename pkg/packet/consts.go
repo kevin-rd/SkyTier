@@ -15,9 +15,20 @@ const (
 	TypeAuxPeers
 	TypeAuxPeersReply
 
-	// TypeHandshake is handshake packet type
-	TypeHandshake
+	TypePeerDiscovery
+	TypePeerDiscoveryResp
+
+	TypeNATSync
+	TypeNATProbe
+
+	// TypeHandshakeInit is handshake packet type
+	TypeHandshakeInit
 	TypeHandshakeReply
+	TypeHandshakeFinalize
+
+	TypeSessionEstablished
+	TypeSessionACK
+	TypeSessionTeardown
 
 	// TypePing is ping packet type
 	TypePing

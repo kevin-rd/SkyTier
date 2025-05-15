@@ -2,7 +2,6 @@ package router
 
 import (
 	"kevin-rd/my-tier/internal/peer"
-	"kevin-rd/my-tier/internal/seed"
 	"kevin-rd/my-tier/internal/tun"
 	"kevin-rd/my-tier/pkg/packet"
 	"log"
@@ -37,30 +36,8 @@ func (r *Router) Input(w packet.Writer, pkt *packet.Packet[packet.Packable]) {
 		// 2. 转发到其他节点
 		// 3. 转发到本地
 		r.toTun(pkt)
-	case packet.TypeAuxPeers:
-		// authentication
-		// todo
-
-		networkName := "default"
-		peers := r.manager.GetPeers(networkName)
-
-		if _, err := w.WritePayload(packet.TypeAuxPeersReply, &seed.PeersReplyPayload{
-			Peers: peers,
-		}); err != nil {
-			log.Printf("[router] write payload error: %v", err)
-			return
-		}
-	case packet.TypePing:
-		if p := r.manager.GetPeer(w.RemoteAddr()); p != nil {
-			p.HandlePing(pkt)
-		}
-	case packet.TypeHandshake:
-		handshake, ok := pkt.Payload.(*packet.PayloadHandshake)
-		if !ok {
-			log.Printf("[router] invalid handshake payload")
-			return
-		}
-		r.manager.Handshake(w, handshake)
+	default:
+		r.manager.HandlePacket(w, pkt)
 	}
 }
 

@@ -9,9 +9,9 @@ import (
 
 func PrintPeers(peers []*peer.Peer) error {
 	table := tablewriter.NewTable(os.Stdout, tablewriter.WithRenderer(renderer.NewMarkdown()))
-	table.Header([]string{"ID", "CIDR", "RemoteAddr", "State"})
+	table.Header([]string{"ID", "VirtualIP", "RemoteAddr", "State"})
 	for _, p := range peers {
-		_ = table.Append([]any{p.ID, p.CIDR, p.RemoteAddr, p.State})
+		_ = table.Append([]any{p.ID, p.VirtualIP, p.RemoteAddr, p.State})
 	}
 
 	if err := table.Render(); err != nil {

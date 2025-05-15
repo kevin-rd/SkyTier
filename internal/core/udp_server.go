@@ -1,118 +1,42 @@
 package core
 
 import (
-	"io"
+	"kevin-rd/my-tier/internal/peer"
 	"kevin-rd/my-tier/internal/router"
 	"kevin-rd/my-tier/pkg/packet"
 	"log"
 	"net"
-	"sync"
-	"time"
 )
-
-var (
-	bufPool = sync.Pool{
-		New: func() any {
-			return make([]byte, 1500)
-		},
-	}
-)
-
-type conn struct {
-	server     *UDPServer
-	remoteAddr string
-	net.Conn
-
-	buf []byte
-}
-
-func (c *conn) serve() {
-	//defer func() {
-	//	if err := recover(); err != nil {
-	//		log.Printf("mixed_server: panic serving %v: %v", c.remoteAddr, err)
-	//	}
-	//	c.close()
-	//}()
-
-	// todo: 使用bufio
-	c.buf = bufPool.Get().([]byte)
-	for {
-		n, err := c.Read(c.buf)
-		if err != nil {
-			if err == io.EOF {
-				log.Printf("[udp_server] connection closed by client: %v", c.remoteAddr)
-			} else {
-				log.Printf("[udp_server] udp server read error from %v: %v", c.remoteAddr, err)
-			}
-			return
-		}
-
-		pkt := &packet.Packet[packet.Packable]{}
-		if err = pkt.Decode(c.buf[:n]); err != nil {
-			log.Printf("[udp_server] udp server read error from %v: %v", c.remoteAddr, err)
-			continue
-		}
-
-		c.server.router.Input(packet.NewWriter(c.Conn), pkt)
-	}
-}
-
-func (c *conn) close() {
-	if c.buf != nil {
-		bufPool.Put(c.buf)
-	}
-
-	if err := c.Close(); err != nil {
-		log.Println("close conn error on defer:", err)
-	}
-}
 
 type UDPServer struct {
-	ListenAddr string
-	router     *router.Router
+	ListenAddr  *net.UDPAddr
+	router      *router.Router
+	peerManager *peer.Manager
 }
 
 func (s *UDPServer) ListenAndServe() error {
-	listener, err := net.Listen("tcp", s.ListenAddr)
-	if err != nil {
-		return err
+	ln, errL := net.ListenUDP("udp", s.ListenAddr)
+	if errL != nil {
+		return errL
 	}
 
-	var tempDelay time.Duration // how long to sleep on accept temporary failure
-
+	buf := make([]byte, 1500)
 	for {
-		var rwc net.Conn
-		rwc, err = listener.Accept()
-		if err != nil {
-			if ne, ok := err.(net.Error); ok && ne.Temporary() {
-				if tempDelay == 0 {
-					tempDelay = 5 * time.Millisecond
-				} else {
-					tempDelay *= 2
-					if tempDelay > 1*time.Second {
-						tempDelay = 1 * time.Second
-					}
-				}
 
-				log.Println("[udp_server] temporary listen error:", err)
-				time.Sleep(tempDelay)
-				continue
-			}
-			log.Println("[udp_server] accept error:", err)
-			return err
+		n, addr, err := ln.ReadFromUDP(buf)
+		if err != nil {
+			log.Println("[udp_server] read error:", err)
+			continue
 		}
 
-		tempDelay = 0
-		c := s.newConn(rwc)
-		// todo: add context
-		go c.serve()
-	}
-}
+		log.Printf("[udp_server] read from %v: %v", addr, string(buf[:n]))
 
-func (s *UDPServer) newConn(rwc net.Conn) *conn {
-	return &conn{
-		server:     s,
-		remoteAddr: rwc.RemoteAddr().String(),
-		Conn:       rwc,
+		pkt := &packet.Packet[packet.Packable]{}
+		if err = pkt.Decode(buf[:n]); err != nil {
+			log.Printf("[udp_server] packet decode error from %v: %v", addr, err)
+			continue
+		}
+
+		s.router.Input(packet.NewWriter(ln, addr), pkt)
 	}
 }

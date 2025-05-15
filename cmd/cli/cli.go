@@ -8,6 +8,8 @@ import (
 	"kevin-rd/my-tier/pkg/ipc/message"
 	"kevin-rd/my-tier/pkg/ipc/unix_socket"
 	"kevin-rd/my-tier/pkg/packet"
+	"kevin-rd/my-tier/pkg/packet/payload"
+	"kevin-rd/my-tier/pkg/utils"
 	"log"
 	"net"
 	"time"
@@ -40,7 +42,7 @@ var subTest = &cli.Command{
 	Flags: []cli.Flag{
 		&cli.StringFlag{Name: "host", Usage: "server host", Value: "127.0.0.1"},
 		&cli.IntFlag{Name: "port", Usage: "server port", Value: 6780},
-		&cli.UintFlag{Name: "type", Usage: "Packet type", Value: uint(packet.TypeHandshake)},
+		&cli.UintFlag{Name: "type", Usage: "Packet type", Value: uint(packet.TypeHandshakeInit)},
 		&cli.StringFlag{Name: "data", Usage: "Packet body data", Value: "hello"},
 	},
 	Action: func(c *cli.Context) error {
@@ -57,14 +59,14 @@ var subTest = &cli.Command{
 			Version: packet.ProtocolVersion,
 			Type:    byte(c.Uint("type")),
 			Length:  uint16(len(c.String("data"))),
-			Payload: &packet.PayloadHandshake{
-				ID:     [32]byte{'h', 'e', 'l', 'l', 'o'},
-				DHCP:   false,
-				IpCidr: "192.168.5.3/24",
+			Payload: &payload.HandshakeInitPayload{
+				ID:        [32]byte{'h', 'e', 'l', 'l', 'o'},
+				DHCP:      false,
+				VirtualIP: utils.Must2IPMask("192.168.100.5/24"),
 			},
 		}
 
-		writer := packet.NewWriter(conn)
+		writer := packet.NewWriter(conn, conn.RemoteAddr())
 		if _, err := writer.WriteP(pkt); err != nil {
 			return fmt.Errorf("send error: %w", err)
 		}

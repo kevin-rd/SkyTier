@@ -1,51 +1,59 @@
 package peer
 
 import (
-	"bytes"
 	"kevin-rd/my-tier/pkg/packet"
 	"kevin-rd/my-tier/pkg/utils"
 	"log"
 	"net"
 	"sync"
+	"time"
 )
 
 type Manager struct {
 	Info
 
 	mu sync.Mutex
-	// remote_addr -> Peer
-	peerMap map[string]*Peer
+	// unHandshake, remoteAddr -> Peer
+	tempPeers map[string]*Peer
+	// virtualIP -> Peer
+	peerMap map[utils.IPv4]*Peer
 	// network_name -> []*Peer
 	peerGroup map[string][]*Peer
 }
 
-func NewManager(id, cidr string, addrs ...string) *Manager {
+func NewManager(id string, cidr [5]byte, addrs ...string) *Manager {
 	m := &Manager{
-		Info:      Info{ID: id, CIDR: cidr},
-		peerMap:   make(map[string]*Peer),
-		peerGroup: make(map[string][]*Peer),
+		Info:      Info{ID: id, VirtualIP: cidr},
+		peerMap:   map[utils.IPv4]*Peer{},
+		peerGroup: map[string][]*Peer{},
+		tempPeers: map[string]*Peer{},
 	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	// add self to peers
 	m.addPeer("", &Peer{
-		Info: Info{ID: id, CIDR: cidr},
+		Info: Info{ID: id, VirtualIP: cidr},
 		// todo: Writer, RemoteAddr
 	})
 
+	// conn to default peers
 	for _, addr := range addrs {
-		peer, err := m.connTo(addr)
+		conn, err := net.Dial("udp", addr)
 		if err != nil {
-			log.Printf("connect to %s error: %v", addr, err)
+			log.Printf("[peer_manager] connect to %s error: %v", addr, err)
 			continue
 		}
-		m.peerMap[addr] = peer
+		log.Printf("[peer] connect to %s success", addr)
+		m.newConn(packet.NewWriter(conn, conn.RemoteAddr()))
 	}
 
 	return m
 }
 
-func (m *Manager) GetPeer(remoteAddr string) *Peer {
-	if peer, ok := m.peerMap[remoteAddr]; ok {
+func (m *Manager) GetPeer(vip utils.IPv4) *Peer {
+	if peer, ok := m.peerMap[vip]; ok {
 		return peer
 	}
 	return nil
@@ -57,50 +65,58 @@ func (m *Manager) GetPeers(network string) []*Peer {
 }
 
 func (m *Manager) Manage() error {
-	// todo: 启动
+	// process tempPeers
+	for _, p := range m.tempPeers {
+		switch p.State {
+		case STATE_INIT:
+			if err := p.handshake(m.Info); err != nil {
+				log.Println("[peer] handshake error:", err)
+				time.Sleep(time.Second * 1)
+				continue
+			}
+			m.handshaked(p, p.Info)
+			p.State = STATE_HANDSHAKED
+		case STATE_HANDSHAKED:
+			pkt := <-p.outputCh
+			_, err := p.WriteP(pkt)
+			if err != nil {
+				log.Println("[peer] write packet error:", err)
+				continue
+			}
+
+			// todo? 是否要将接受数据和发送数据逻辑整合到一起
+		}
+	}
+
 	return nil
 }
 
-// connTo 主动连接到Peer
-func (m *Manager) connTo(addr string) (*Peer, error) {
-	conn, err := net.Dial("udp", addr)
-	if err != nil {
-		log.Printf("[peer] dial %s error: %v", addr, err)
-		return nil, err
-	}
-
-	return &Peer{
-		Info:   Info{ID: "unknown_" + utils.RandomString(16), CIDR: addr},
-		Writer: packet.NewWriter(conn),
-	}, nil
-}
-
-// Handshake 处理握手消息, 被动连接Peer
-func (m *Manager) Handshake(w packet.Writer, handshake *packet.PayloadHandshake) {
-	id := bytes.Trim(handshake.ID[:], "\x00")
-	peer, ok := m.peerMap[string(id)]
+// newConn add new Conn to tempPeers
+func (m *Manager) newConn(writer packet.Writer) *Peer {
+	p, ok := m.tempPeers[writer.RemoteAddr().String()]
 	if !ok {
-		log.Printf("[peer] new peer: %s %s", id, handshake.IpCidr)
-		peer = &Peer{
-			Info: Info{string(id), handshake.IpCidr},
+		log.Printf("[peer] new peer: %s", writer.RemoteAddr())
+		p = &Peer{
+			State:      STATE_INIT,
+			RemoteAddr: writer.RemoteAddr().String(),
+			Writer:     writer,
+			outputCh:   make(chan *packet.Packet[packet.Packable]),
 		}
+		m.tempPeers[writer.RemoteAddr().String()] = p
 	}
-	// add to group
-	m.addPeer("", peer)
-
-	// write reply message
-	pkt := packet.NewPacket(packet.TypeHandshakeReply, &packet.HandshakeReplyPayload{Hello: "ni hao"})
-	if _, err := w.WriteP(pkt); err != nil {
-		log.Printf("[peer] write handshake reply error: %v", err)
-		return
-	}
-	peer.State = STATE_HANDSHAKED
+	return p
 }
 
-func (m *Manager) addPeer(network string, peer *Peer) {
+func (m *Manager) handshaked(p *Peer, info Info) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.peerMap[peer.RemoteAddr] = peer
+	delete(m.tempPeers, p.RemoteAddr)
+	m.addPeer("", p)
+	p.handshaked(info)
+}
+
+func (m *Manager) addPeer(network string, peer *Peer) {
+	m.peerMap[utils.IPv4(peer.VirtualIP[:4])] = peer
 	m.peerGroup[network] = append(m.peerGroup[network], peer)
 }

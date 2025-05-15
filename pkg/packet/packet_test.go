@@ -33,7 +33,7 @@ func (m *MockPackable) Length() int {
 // Constants for test
 const (
 	TestVersion = byte(1)
-	TestType    = TypeHandshake
+	TestType    = TypeHandshakeInit
 )
 
 var (
