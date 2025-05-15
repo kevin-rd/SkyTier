@@ -101,10 +101,9 @@ var subPeers = &cli.Command{
 		if err != nil {
 			log.Fatalf("[peers] get resp error: %v", err)
 		}
-		if err := print.Print(resp.Peers); err != nil {
+		if err := print.PrintPeers(resp.Peers); err != nil {
 			return err
 		}
-		log.Println(resp)
 		return nil
 	},
 }

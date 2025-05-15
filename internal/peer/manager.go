@@ -6,23 +6,31 @@ import (
 	"kevin-rd/my-tier/pkg/utils"
 	"log"
 	"net"
+	"sync"
 )
 
 type Manager struct {
 	Info
 
+	mu sync.Mutex
 	// remote_addr -> Peer
-	PeerMap map[string]*Peer
-
+	peerMap map[string]*Peer
 	// network_name -> []*Peer
-	PeerGroup map[string][]*Peer
+	peerGroup map[string][]*Peer
 }
 
 func NewManager(id, cidr string, addrs ...string) *Manager {
 	m := &Manager{
-		Info:    Info{ID: id, CIDR: cidr},
-		PeerMap: make(map[string]*Peer),
+		Info:      Info{ID: id, CIDR: cidr},
+		peerMap:   make(map[string]*Peer),
+		peerGroup: make(map[string][]*Peer),
 	}
+
+	// add self to peers
+	m.addPeer("", &Peer{
+		Info: Info{ID: id, CIDR: cidr},
+		// todo: Writer, RemoteAddr
+	})
 
 	for _, addr := range addrs {
 		peer, err := m.connTo(addr)
@@ -30,14 +38,14 @@ func NewManager(id, cidr string, addrs ...string) *Manager {
 			log.Printf("connect to %s error: %v", addr, err)
 			continue
 		}
-		m.PeerMap[addr] = peer
+		m.peerMap[addr] = peer
 	}
 
 	return m
 }
 
 func (m *Manager) GetPeer(remoteAddr string) *Peer {
-	if peer, ok := m.PeerMap[remoteAddr]; ok {
+	if peer, ok := m.peerMap[remoteAddr]; ok {
 		return peer
 	}
 	return nil
@@ -45,7 +53,7 @@ func (m *Manager) GetPeer(remoteAddr string) *Peer {
 
 func (m *Manager) GetPeers(network string) []*Peer {
 	// todo
-	return m.PeerGroup[network]
+	return m.peerGroup[network]
 }
 
 func (m *Manager) Manage() error {
@@ -70,7 +78,7 @@ func (m *Manager) connTo(addr string) (*Peer, error) {
 // Handshake 处理握手消息, 被动连接Peer
 func (m *Manager) Handshake(w packet.Writer, handshake *packet.PayloadHandshake) {
 	id := bytes.Trim(handshake.ID[:], "\x00")
-	peer, ok := m.PeerMap[string(id)]
+	peer, ok := m.peerMap[string(id)]
 	if !ok {
 		log.Printf("[peer] new peer: %s %s", id, handshake.IpCidr)
 		peer = &Peer{
@@ -90,9 +98,9 @@ func (m *Manager) Handshake(w packet.Writer, handshake *packet.PayloadHandshake)
 }
 
 func (m *Manager) addPeer(network string, peer *Peer) {
-	m.PeerMap[peer.RemoteAddr] = peer
-	if _, ok := m.PeerGroup[network]; !ok {
-		m.PeerGroup[network] = make([]*Peer, 5)
-	}
-	m.PeerGroup[network] = append(m.PeerGroup[network], peer)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.peerMap[peer.RemoteAddr] = peer
+	m.peerGroup[network] = append(m.peerGroup[network], peer)
 }

@@ -72,6 +72,7 @@ func (s *Server) handleConn(conn net.Conn) {
 	buf := bufPool.Get().([]byte)
 	defer bufPool.Put(buf)
 
+	w := message.NewWriter(conn)
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
@@ -88,13 +89,13 @@ func (s *Server) handleConn(conn net.Conn) {
 			log.Printf("[ipc] decode message error from %v: %v", conn.RemoteAddr(), err)
 			continue
 		}
+
 		h, ok := s.Router.GetRouter(msg.Kind)
 		if !ok {
 			log.Printf("[ipc] unknown message kind: %d", msg.Kind)
 			continue
 		}
 
-		w := message.NewWriter(conn)
 		h(w, &msg)
 	}
 }

@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"io"
 	"kevin-rd/my-tier/internal/router"
 	"kevin-rd/my-tier/pkg/packet"
@@ -76,7 +75,7 @@ type UDPServer struct {
 func (s *UDPServer) ListenAndServe() error {
 	listener, err := net.Listen("tcp", s.ListenAddr)
 	if err != nil {
-		return fmt.Errorf("[udp_server] listen error: %w", err)
+		return err
 	}
 
 	var tempDelay time.Duration // how long to sleep on accept temporary failure
