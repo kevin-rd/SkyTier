@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/urfave/cli/v2"
+	"kevin-rd/my-tier/internal/cli/print"
 	"kevin-rd/my-tier/pkg/ipc/message"
 	"kevin-rd/my-tier/pkg/ipc/unix_socket"
 	"kevin-rd/my-tier/pkg/packet"
@@ -91,13 +92,18 @@ var subPeers = &cli.Command{
 	Name:  "peers",
 	Usage: "Get peers",
 	Action: func(c *cli.Context) error {
-		resp, err := unix_socket.Get(&message.Message{
-			Kind: message.KindPeers,
-		})
+		req, err := message.New(message.KindPeers, &message.PeersReq{Network: "tao"})
 		if err != nil {
-			log.Fatalf("get peers error: %v", err)
+			log.Printf("[peers] new req error: %v", err)
+			return err
 		}
-		// todo: 显示
+		resp, err := unix_socket.Get[message.PeersResp](req)
+		if err != nil {
+			log.Fatalf("[peers] get resp error: %v", err)
+		}
+		if err := print.Print(resp.Peers); err != nil {
+			return err
+		}
 		log.Println(resp)
 		return nil
 	},

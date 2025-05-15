@@ -14,12 +14,10 @@ type UnixSocket struct {
 	path string
 }
 
-func New(path string, router *ipc.Router) *UnixSocket {
+func NewServer(path string) *UnixSocket {
 	return &UnixSocket{
-		Server: &ipc.Server{
-			Router: router,
-		},
-		path: path,
+		Server: ipc.NewServer(),
+		path:   path,
 	}
 }
 
@@ -36,8 +34,4 @@ func (s *UnixSocket) ListenAndServe() error {
 	}
 
 	return s.Serve(ln)
-}
-
-func (s *UnixSocket) Register(kind int, handler ipc.Handler) {
-	s.Router.Register(kind, handler)
 }

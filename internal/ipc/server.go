@@ -17,8 +17,31 @@ var bufPool = sync.Pool{
 	},
 }
 
+type Handler func(writer message.Writer, msg *message.Message)
+
+type router struct {
+	handlers map[int]Handler
+}
+
+func (r *router) Register(kind int, handler Handler) {
+	r.handlers[kind] = handler
+}
+
+func (r *router) GetRouter(kind int) (Handler, bool) {
+	h, ok := r.handlers[kind]
+	return h, ok
+}
+
 type Server struct {
-	Router *Router
+	Router *router
+}
+
+func NewServer() *Server {
+	return &Server{
+		Router: &router{
+			handlers: make(map[int]Handler),
+		},
+	}
 }
 
 func (s *Server) Serve(ln net.Listener) error {
@@ -65,7 +88,17 @@ func (s *Server) handleConn(conn net.Conn) {
 			log.Printf("[ipc] decode message error from %v: %v", conn.RemoteAddr(), err)
 			continue
 		}
+		h, ok := s.Router.GetRouter(msg.Kind)
+		if !ok {
+			log.Printf("[ipc] unknown message kind: %d", msg.Kind)
+			continue
+		}
 
-		s.Router.serve(conn, &msg)
+		w := message.NewWriter(conn)
+		h(w, &msg)
 	}
+}
+
+func (s *Server) Register(kind int, handler Handler) {
+	s.Router.Register(kind, handler)
 }

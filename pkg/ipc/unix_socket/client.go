@@ -12,7 +12,7 @@ const (
 	UNIX_SOCKET_PATH = "/tmp/skytier-core.sock"
 )
 
-func Get(msg *message.Message) (*message.Message, error) {
+func Get[T any](msg *message.Message) (*T, error) {
 	conn, err := net.Dial("unix", UNIX_SOCKET_PATH)
 	if err != nil {
 		log.Printf("dial error: %v", err)
@@ -31,10 +31,11 @@ func Get(msg *message.Message) (*message.Message, error) {
 		return nil, errors.Join(errors.New("decode error"), err)
 	}
 
-	// todo: 二次unmarshal
-
-	if resp.Kind != message.KindPeers {
-		return nil, errors.New("invalid response kind")
+	// decode payload
+	peers, err := message.DecodePayload[T](&resp)
+	if err != nil {
+		return nil, errors.Join(errors.New("decode payload error"), err)
 	}
-	return &resp, nil
+
+	return peers, nil
 }

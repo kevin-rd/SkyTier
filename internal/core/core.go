@@ -3,7 +3,6 @@ package core
 
 import (
 	"fmt"
-	"kevin-rd/my-tier/internal/ipc"
 	"kevin-rd/my-tier/internal/ipc/unixsocket"
 	"kevin-rd/my-tier/internal/peer"
 	"kevin-rd/my-tier/internal/router"
@@ -62,7 +61,7 @@ func (c *Core) Run() error {
 	}()
 
 	// Unix Socket Server
-	c.UnixSocket = unix_socket.New(ipc_unix.UNIX_SOCKET_PATH, ipc.NewRouter())
+	c.UnixSocket = unix_socket.NewServer(ipc_unix.UNIX_SOCKET_PATH)
 	c.UnixSocket.Register(message.KindPeers, c.UnixSocket.HandleGetPeers(c.peerManager.GetPeers))
 	log.Printf("[core] start unix socket server on: %v", ipc_unix.UNIX_SOCKET_PATH)
 	go func() {
